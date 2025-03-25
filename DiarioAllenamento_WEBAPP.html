@@ -1,0 +1,931 @@
+
+<!DOCTYPE html>
+
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Diario Allenamento AI - v7</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body { background-color: #121212; color: #fff; font-family: Arial; padding: 20px; }
+    input, select { background: #1e1e1e; color: #fff; border: 1px solid #444; padding: 8px; margin: 5px 0; width: 100%; }
+    button { margin-top: 10px; padding: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #555; padding: 8px; text-align: center; }
+    th { background: #333; }
+    .alert { color: red; font-weight: bold; }
+    .ok { color: lightgreen; font-weight: bold; }
+    .attenzione { color: orange; font-weight: bold; }
+    #macroSuggeriti { margin-top: 15px; padding: 10px; background: #1e1e1e; border: 1px solid #444; }
+  </style>
+<link href="manifest.json" rel="manifest"/></head>
+<body>
+<h1>Diario Allenamento AI - v7 con Minuti &amp; YAZIO</h1>
+<label>Data</label>
+<input id="data" type="date"/>
+<label>Allenamento</label>
+<select id="allenamento" onchange="autoCalcolaMacro()">
+<option value="Riposo">Riposo</option>
+<option value="A">Allenamento A</option>
+<option value="B">Allenamento B</option>
+<option value="C">Allenamento C</option>
+</select>
+<label>Minuti di allenamento (solo se A/B/C)</label>
+<input id="minuti" onchange="autoCalcolaMacro()" type="number" value="60"/>
+<div id="macroSuggeriti"></div>
+<label>Proteine (g)</label>
+<input id="proteine" type="number"/>
+<label>Carboidrati (g)</label>
+<input id="carboidrati" type="number"/>
+<label>Grassi (g)</label>
+<input id="grassi" type="number"/>
+<button onclick="salva()">Salva</button>
+<button onclick="resetStorico()">Reset</button>
+<table id="storico">
+<thead>
+<tr>
+<th>Data</th>
+<th>Allenamento</th>
+<th>Calorie</th>
+<th>Deficit</th><th>Seleziona</th>
+<th>Peso</th>
+<th>M. Grassa (kg / %)</th>
+<th>M. Magra</th>
+<th>Alert</th>
+<th>X</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+<div id="riepilogoSelezionati" style="margin-top:10px; font-weight:bold;"></div>
+<div id="mediaSelezionati" style="margin-top:10px; font-weight:bold;"></div>
+<script>
+
+
+function selezionaTutti(source = null) {
+  const checkboxes = document.querySelectorAll('.row-select');
+  checkboxes.forEach(cb => cb.checked = true);
+  aggiornaRiepilogoSelezione();
+}
+);
+  aggiornaRiepilogoSelezione();
+}
+
+
+function eliminaSelezionati() {
+  const selezionati = Array.from(document.querySelectorAll(".row-select"))
+    .filter(cb => cb.checked)
+    .map(cb => parseInt(cb.dataset.index))
+    .sort((a, b) => b - a);
+
+  selezionati.forEach(i => storico.splice(i, 1));
+  localStorage.setItem("storicoFinale", JSON.stringify(storico));
+  aggiornaTabella();
+  aggiornaRiepilogoSelezione();
+}
+
+
+
+
+function aggiornaRiepilogoSelezione() {
+  const righe = Array.from(document.querySelectorAll('.row-select'))
+    .filter(cb => cb.checked)
+    .map(cb => parseInt(cb.dataset.index));
+
+  let peso = 79.5, mg = 79.5 * 0.129;
+  let totPeso = 0, totGrasso = 0, totMagra = 0;
+
+  righe.forEach(i => {
+    const r = storico[i];
+    const def = r.tdee - r.kcal;
+    const pro = r.proteine;
+    let grasso = 0, muscolo = 0;
+    if (def > 700 || pro < 1.6 * peso) {
+      grasso = (def * 0.85) / 7700;
+      muscolo = (def * 0.15) / 7700;
+    } else {
+      grasso = def / 7700;
+      muscolo = 0;
+    }
+    totGrasso += grasso;
+    totPeso += (grasso + muscolo);
+    totMagra += muscolo;
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+  });
+
+  const giorni = righe.length;
+  const mediaPeso = giorni ? (totPeso / giorni).toFixed(3) : "0";
+  const mediaGrasso = giorni ? (totGrasso / giorni).toFixed(3) : "0";
+  const mediaMagra = giorni ? (totMagra / giorni).toFixed(3) : "0";
+
+  document.getElementById("riepilogoSelezionati").innerHTML =
+    `Selezionati ${giorni} giorni: <span class='ok'>${totPeso.toFixed(2)} kg</span> persi, ` +
+    `<span class='ok'>${totGrasso.toFixed(2)} kg</span> di grasso, ` +
+    `<span class='attenzione'>${totMagra.toFixed(2)} kg</span> di massa magra.`;
+
+  document.getElementById("mediaSelezionati").innerHTML =
+    `<span class='attenzione'>Media per giorno:</span> <strong>${mediaPeso} kg</strong> peso perso, ` +
+    `<strong>${mediaGrasso} kg</strong> grasso perso, ` +
+    `<strong>${mediaMagra} kg</strong> massa magra persa.`;
+}
+    totGrasso += grasso;
+    totPeso += (grasso + muscolo);
+    totMagra += muscolo;
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+  });
+
+  const giorni = righe.length;
+  const mediaPeso = giorni ? (totPeso / giorni).toFixed(3) : "0";
+  const mediaGrasso = giorni ? (totGrasso / giorni).toFixed(3) : "0";
+  const mediaMagra = giorni ? (totMagra / giorni).toFixed(3) : "0";
+
+  document.getElementById("riepilogoSelezionati").innerHTML =
+    `Selezionati ${giorni} giorni: <span class='ok'>${totPeso.toFixed(2)} kg</span> persi, ` +
+    `<span class='ok'>${totGrasso.toFixed(2)} kg</span> di grasso, ` +
+    `<span class='attenzione'>${totMagra.toFixed(2)} kg</span> di massa magra.`;
+
+  document.getElementById("mediaSelezionati").innerHTML =
+    `<span class='attenzione'>Media per giorno:</span> <strong>${mediaPeso} kg</strong> peso perso, ` +
+    `<strong>${mediaGrasso} kg</strong> grasso perso, ` +
+    `<strong>${mediaMagra} kg</strong> massa magra persa.`;
+}
+
+    totGrasso += grasso;
+    totPeso += (grasso + muscolo);
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+  });
+
+  const giorni = righe.length;
+  const mediaPeso = giorni ? (totPeso / giorni).toFixed(3) : "0";
+  const mediaGrasso = giorni ? (totGrasso / giorni).toFixed(3) : "0";
+
+  document.getElementById("riepilogoSelezionati").innerHTML =
+    `Selezionati ${giorni} giorni: <span class='ok'>${totPeso.toFixed(2)} kg</span> persi, ` +
+    `<span class='ok'>${totGrasso.toFixed(2)} kg</span> di grasso.`;
+
+  document.getElementById("mediaSelezionati").innerHTML =
+    `<span class='attenzione'>Media per giorno:</span> <strong>${mediaPeso} kg</strong> persi, ` +
+    `<strong>${mediaGrasso} kg</strong> di grasso`;
+}
+
+    totGrasso += grasso;
+    totPeso += (grasso + muscolo);
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+  });
+
+  document.getElementById("riepilogoSelezionati").innerHTML =
+    `Selezionati ${righe.length} giorni: <span class='ok'>${totPeso.toFixed(2)} kg</span> persi, ` +
+    `<span class='ok'>${totGrasso.toFixed(2)} kg</span> di grasso.`;
+}
+
+document.addEventListener("change", function(e) {
+  if (e.target.classList.contains("row-select")) aggiornaRiepilogoSelezione();
+});
+</script>
+<script>
+let storico = JSON.parse(localStorage.getItem("storicoFinale")) || [];
+const base = {
+  peso: 79.5,
+  massaGrassaKg: +(79.5 * 12.9 / 100).toFixed(2),
+  massaMagraKg: +(79.5 - (79.5 * 12.9 / 100)).toFixed(2),
+  bmr: 10 * 79.5 + 6.25 * 184 - 5 * 30 + 5,
+  yazio: { pro: 172, cho: 236, fat: 73, kcal: 2289 }
+};
+
+function autoCalcolaMacro() {
+  const tipo = document.getElementById("allenamento").value;
+  const minuti = parseInt(document.getElementById("minuti").value) || 0;
+  const kcalPerMinuto = 7;
+  const pro = Math.round(base.peso * 2.2);
+  const fat = Math.round(base.peso * 0.9);
+  const kcalPro = pro * 4;
+  const kcalFat = fat * 9;
+  let tdee = base.bmr * 1.4;
+  let obiettivo = "";
+
+  if (["A", "B", "C"].includes(tipo)) {
+    const extra = minuti * kcalPerMinuto;
+    tdee += extra;
+    tdee -= 250; // piccolo deficit
+    obiettivo = "Allenamento";
+  } else {
+    tdee -= 500; // deficit più marcato
+    obiettivo = "Riposo";
+  }
+
+  const carb = Math.round((tdee - kcalPro - kcalFat) / 4);
+  document.getElementById("proteine").value = pro;
+  document.getElementById("grassi").value = fat;
+  document.getElementById("carboidrati").value = carb;
+
+  document.getElementById("macroSuggeriti").innerHTML = `
+    <strong>Oggi è un giorno di: ${obiettivo}</strong><br>
+    Macro consigliati: <span class="ok">${pro}P / ${fat}G / ${carb}C</span> (~${Math.round(tdee)} kcal)<br>
+    Piano YAZIO: <span class="attenzione">${base.yazio.pro}P / ${base.yazio.fat}G / ${base.yazio.cho}C</span> (${base.yazio.kcal} kcal)
+  `;
+}
+
+function salva() {
+  const data = document.getElementById("data").value;
+  const tipo = document.getElementById("allenamento").value;
+  const pro = parseFloat(document.getElementById("proteine").value);
+  const cho = parseFloat(document.getElementById("carboidrati").value);
+  const fat = parseFloat(document.getElementById("grassi").value);
+  if (!data || isNaN(pro) || isNaN(cho) || isNaN(fat)) return alert("Completa tutti i campi.");
+
+  const kcal = Math.round(pro * 4 + cho * 4 + fat * 9);
+  const tdee = Math.round(base.bmr * 1.4 + (["A", "B", "C"].includes(tipo) ? (parseInt(document.getElementById("minuti").value) || 0) * 7 : 0));
+  const record = { data, allenamento: tipo, proteine: pro, carboidrati: cho, grassi: fat, kcal, tdee };
+  storico.push(record);
+  localStorage.setItem("storicoFinale", JSON.stringify(storico));
+  aggiornaTabella();
+}
+
+function resetStorico() {
+  if (confirm("Cancellare tutti i dati?")) {
+    localStorage.removeItem("storicoFinale");
+    storico = [];
+    aggiornaTabella();
+  }
+}
+
+function aggiornaTabella() {
+  const tbody = document.querySelector("#storico tbody");
+  tbody.innerHTML = "";
+  let peso = base.peso, mg = base.massaGrassaKg;
+  storico.forEach((r, i) => {
+    const deficit = r.tdee - r.kcal;
+    const grassoPerso = deficit / 7700;
+    mg -= grassoPerso;
+    peso -= grassoPerso;
+    const mm = peso - mg;
+    const percGrasso = ((mg / peso) * 100).toFixed(1);
+    let alert = "<span class='ok'>OK</span>";
+    if (r.proteine < 1.6 * peso) alert = "<span class='attenzione'>Proteine basse</span>";
+    if (deficit > 700) alert = "<span class='alert'>Deficit eccessivo!</span>";
+    
+    tbody.innerHTML += `<tr>
+      <td>${r.data}</td>
+      <td>${r.allenamento}</td>
+      <td>${r.kcal}</td>
+      <td>${r.tdee - r.kcal}</td>
+      <td><input type="checkbox" class="row-select" data-index="${i}"></td>
+      <td>${peso.toFixed(2)}</td>
+      <td>${mg.toFixed(2)} / ${((mg / peso) * 100).toFixed(1)}%</td>
+      <td>${(peso - mg).toFixed(2)}</td>
+      <td>${alert}</td>
+      <td><button onclick="elimina(${i})">X</button></td>
+    </tr>`;
+  });
+}
+
+function elimina(i) {
+  storico.splice(i, 1);
+  localStorage.setItem("storicoFinale", JSON.stringify(storico));
+  aggiornaTabella();
+}
+
+
+</script>
+<div id="aiStatus" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function aggiornaAIStatus() {
+  if (storico.length === 0) {
+    document.getElementById("aiStatus").innerHTML = "<p>Inserisci almeno un giorno per ricevere i feedback AI.</p>";
+    return;
+  }
+
+  let peso = 79.5;
+  let mg = 79.5 * 12.9 / 100;
+  const ultimi = storico.slice(-1);
+  const r = ultimi[0];
+  const deficit = r.tdee - r.kcal;
+  const grassoPerso = deficit / 7700;
+  mg -= grassoPerso;
+  peso -= grassoPerso;
+  const mm = peso - mg;
+
+  let alert = "";
+  if (deficit > 700 && r.proteine < 1.6 * peso) {
+    alert = "<span class='alert'>Attenzione: deficit elevato + proteine basse = rischio perdita muscolare!</span>";
+  } else {
+    alert = "<span class='ok'>Taglio controllato. Massa magra protetta.</span>";
+  }
+
+  const pesoMancante = (peso - 74).toFixed(1);
+  const grassoMancante = (mg - (peso * 0.09)).toFixed(1);
+  const massaMagraAttuale = (peso - mg).toFixed(2);
+  const daMantenere = (67.34).toFixed(2);
+
+  // Genera barra massa magra
+  const mmVal = parseFloat(massaMagraAttuale);
+  const min = 67.34, max = 69.24, step = 0.2;
+  const total = Math.round((max - min) / step);
+  let index = Math.round((mmVal - min) / step);
+  if (index < 0) index = 0;
+  if (index > total) index = total;
+  const filled = "█".repeat(index);
+  const empty = "░".repeat(total - index);
+  const bar = `[${filled}${empty}]`;
+
+  const zoneMsg = (mmVal < 67.34) 
+    ? "<span class='alert'>Zona critica! Massa magra sotto il minimo!</span>"
+    : "<span class='ok'>Massa muscolare in zona sicura.</span>";
+
+  document.getElementById("aiStatus").innerHTML = `
+    <h3>AI Progress Tracker</h3>
+    <p><strong>Peso da perdere:</strong> $${pesoMancante} kg</p>
+    <p><strong>Grasso da perdere:</strong> $${grassoMancante} kg</p>
+    <p><strong>Massa magra attuale:</strong> $${massaMagraAttuale} kg (minimo: $${daMantenere} kg)</p>
+    <pre>${bar} ${massaMagraAttuale} kg</pre>
+    <p>${zoneMsg}</p>
+    <p>${alert}</p>
+  `;
+}
+
+
+</script>
+<div id="notificaSettimana" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function aggiornaNotificaSettimana() {
+  const div = document.getElementById("notificaSettimana");
+  if (storico.length < 2) {
+    div.innerHTML = "<p>Inserisci almeno due giorni per ricevere il riepilogo settimanale.</p>";
+    return;
+  }
+
+  const settimanaCorrente = {};
+  let peso = 79.5;
+  let mg = 79.5 * 12.9 / 100;
+
+  storico.forEach(r => {
+    const d = new Date(r.data);
+    const week = `${d.getFullYear()}-W${Math.ceil((d.getDate() + 6 - d.getDay()) / 7)}`;
+    const deficit = r.tdee - r.kcal;
+    const grasso = deficit / 7700;
+    mg -= grasso;
+    peso -= grasso;
+    const mm = peso - mg;
+
+    if (!settimanaCorrente[week]) settimanaCorrente[week] = [];
+    settimanaCorrente[week].push(mm);
+  });
+
+  const keys = Object.keys(settimanaCorrente);
+  const lastWeek = keys[keys.length - 1];
+  const valori = settimanaCorrente[lastWeek];
+  const delta = (valori[valori.length - 1] - valori[0]).toFixed(2);
+
+  let colore = "ok";
+  let messaggio = "Massa muscolare stabile o in crescita: ottimo lavoro!";
+  if (delta < -0.4) {
+    colore = "alert";
+    messaggio = "Hai perso troppa massa magra questa settimana! Rivedi calorie o proteine.";
+  } else if (delta < -0.2) {
+    colore = "attenzione";
+    messaggio = "Leggera perdita di massa magra: resta in allerta!";
+  }
+
+  div.innerHTML = `
+    <h3>AI Notifica Settimanale</h3>
+    <p class='${colore}'>Settimana ${lastWeek}: variazione massa magra: ${delta} kg</p>
+    <p>${messaggio}</p>
+  `;
+}
+
+
+</script>
+<div id="aiStatus" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function aggiornaAIStatus() {
+  if (storico.length === 0) {
+    document.getElementById("aiStatus").innerHTML = "<p>Inserisci almeno un giorno per ricevere i feedback AI.</p>";
+    return;
+  }
+
+  let peso = 79.5;
+  let mg = 79.5 * 12.9 / 100;
+
+  const ultimi = storico.slice(-1);
+  const r = ultimi[0];
+  const deficit = r.tdee - r.kcal;
+
+  // Logica realistica: parte del peso perso è muscolo se condizioni critiche
+  let grassoPerso = 0;
+  let muscoloPerso = 0;
+  if (deficit > 700 || r.proteine < 1.6 * peso) {
+    grassoPerso = (deficit * 0.85) / 7700;
+    muscoloPerso = (deficit * 0.15) / 7700;
+  } else {
+    grassoPerso = deficit / 7700;
+    muscoloPerso = 0;
+  }
+
+  mg -= grassoPerso;
+  peso -= grassoPerso + muscoloPerso;
+  const mm = peso - mg;
+
+  let alert = "";
+  if (muscoloPerso > 0) {
+    alert = "<span class='alert'>Perdita muscolare stimata: " + muscoloPerso.toFixed(2) + " kg</span>";
+  } else {
+    alert = "<span class='ok'>Massa magra protetta!</span>";
+  }
+
+  const pesoMancante = (peso - 74).toFixed(1);
+  const grassoMancante = (mg - (peso * 0.09)).toFixed(1);
+  const massaMagraAttuale = mm.toFixed(2);
+  const daMantenere = (67.34).toFixed(2);
+
+  // Barra visiva
+  const mmVal = parseFloat(massaMagraAttuale);
+  const min = 67.34, max = 69.24, step = 0.2;
+  const total = Math.round((max - min) / step);
+  let index = Math.round((mmVal - min) / step);
+  if (index < 0) index = 0;
+  if (index > total) index = total;
+  const filled = "█".repeat(index);
+  const empty = "░".repeat(total - index);
+  const bar = `[${filled}${empty}]`;
+
+  const zoneMsg = (mmVal < 67.34)
+    ? "<span class='alert'>Zona critica! Massa magra sotto il minimo!</span>"
+    : "<span class='ok'>Massa muscolare in zona sicura.</span>";
+
+  document.getElementById("aiStatus").innerHTML = `
+    <h3>AI Progress Tracker (reale)</h3>
+    <p><strong>Peso da perdere:</strong> $${pesoMancante} kg</p>
+    <p><strong>Grasso da perdere:</strong> $${grassoMancante} kg</p>
+    <p><strong>Massa magra attuale:</strong> $${massaMagraAttuale} kg (minimo: $${daMantenere} kg)</p>
+    <pre>${bar} $${massaMagraAttuale} kg</pre>
+    <p>${zoneMsg}</p>
+    <p>${alert}</p>
+  `;
+}
+
+
+</script>
+<div id="cumulativoMassaMagra" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function aggiornaCumulativoMassaMagra() {
+  const div = document.getElementById("cumulativoMassaMagra");
+  if (storico.length < 2) {
+    div.innerHTML = "<p>Registra almeno due giorni per vedere il progresso cumulativo sulla massa magra.</p>";
+    return;
+  }
+
+  let peso = 79.5;
+  let mg = 79.5 * 12.9 / 100;
+  let massaMagraIniziale = peso - mg;
+  let massaMagraFinale = massaMagraIniziale;
+
+  storico.forEach(r => {
+    const deficit = r.tdee - r.kcal;
+
+    let grassoPerso = 0;
+    let muscoloPerso = 0;
+
+    if (deficit > 700 || r.proteine < 1.6 * peso) {
+      grassoPerso = (deficit * 0.85) / 7700;
+      muscoloPerso = (deficit * 0.15) / 7700;
+    } else {
+      grassoPerso = deficit / 7700;
+    }
+
+    mg -= grassoPerso;
+    peso -= grassoPerso + muscoloPerso;
+    massaMagraFinale = peso - mg;
+  });
+
+  const delta = (massaMagraFinale - massaMagraIniziale).toFixed(2);
+  let colore = "ok";
+  let testo = "Massa magra mantenuta o migliorata.";
+
+  if (delta < -0.4) {
+    colore = "alert";
+    testo = "Hai perso massa muscolare nel tempo!";
+  } else if (delta < -0.2) {
+    colore = "attenzione";
+    testo = "Leggera perdita di massa muscolare.";
+  }
+
+  div.innerHTML = `
+    <h3>Progresso Cumulativo Massa Magra</h3>
+    <p class="${colore}">Variazione totale: ${delta} kg</p>
+    <p>${testo}</p>
+  `;
+}
+
+
+</script>
+<div id="schedaAllenamento" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function mostraSchedaAllenamento(tipo) {
+  const div = document.getElementById("schedaAllenamento");
+  let contenuto = "";
+  if (tipo === "A") {
+    contenuto = `
+      <h3>Giorno A – Parte Superiore + Core</h3>
+      <ul>
+        <li>Walking o cyclette 5-7 min</li>
+        <li>Panca inclinata con manubri – 4x8</li>
+        <li>Lat machine presa stretta – 4x10</li>
+        <li>Arnold press manubri – 3x10</li>
+        <li>Superset: Alzate laterali + Curl manubri – 3x12 + 3x10</li>
+        <li>Pushdown tricipiti o French press – 3x10</li>
+        <li>Core: Leg raise + Crunch inversi – 3x15</li>
+        <li>Plank – 3x 40''-60''</li>
+      </ul>`;
+  } else if (tipo === "B") {
+    contenuto = `
+      <h3>Giorno B – Parte Inferiore + Core</h3>
+      <ul>
+        <li>Tapis roulant inclinato o stepper – 5 min</li>
+        <li>Squat con bilanciere – 4x8</li>
+        <li>Hip thrust con bilanciere – 4x10</li>
+        <li>Affondi camminati con manubri – 3x24 passi</li>
+        <li>Leg curl machine – 3x12</li>
+        <li>Calf raise in piedi – 3x20</li>
+        <li>Core: Russian twist con peso – 3x20</li>
+        <li>V-up – 3x15</li>
+      </ul>`;
+  } else if (tipo === "C") {
+    contenuto = `
+      <h3>Giorno C – Parte Alta + Obliqui + HIIT</h3>
+      <ul>
+        <li>Cyclette o vogatore 5-7 min + mobilità spalle/core</li>
+        <li>Trazioni alla sbarra – 3x8-10</li>
+        <li>Z Press con manubri (a terra) – 3x10</li>
+        <li>Face Pull al cavo o Reverse Fly – 3x12</li>
+        <li>Woodchopper basso-alto al cavo – 3x12 per lato</li>
+        <li>Side Plank con discesa del fianco – 10-12 per lato</li>
+        <li>Oblique V-Up – 15 per lato</li>
+        <li>Plank con Shoulder Tap – 30 sec</li>
+      </ul>`;
+  } else {
+    contenuto = "";
+  }
+  div.innerHTML = contenuto;
+}
+
+document.getElementById("allenamento").addEventListener("change", function(e) {
+  mostraSchedaAllenamento(e.target.value);
+});
+</script>
+<script>
+window.onload = () => {
+  aggiornaTabella();
+  autoCalcolaMacro();
+  aggiornaAIStatus?.();
+  aggiornaNotificaSettimana?.();
+  aggiornaCumulativoMassaMagra?.();
+  aggiornaGrafico();
+  aggiornaDashboardMensile();
+  mostraGalleria?.();
+  motivazioneCoach?.();
+};
+</script>
+<canvas height="50" id="graficoProgressi" style="margin-top:20px;" width="100%"></canvas>
+<script>
+function aggiornaGrafico() {
+  const labels = [];
+  const pesoData = [];
+  const massaGrassaData = [];
+  const massaMagraData = [];
+  let peso = 79.5, mg = peso * 0.129;
+
+  storico.forEach((r, i) => {
+    const deficit = r.tdee - r.kcal;
+    const pro = r.proteine;
+    let grasso = 0, muscolo = 0;
+    if (deficit > 700 || pro < 1.6 * peso) {
+      grasso = (deficit * 0.85) / 7700;
+      muscolo = (deficit * 0.15) / 7700;
+    } else {
+      grasso = deficit / 7700;
+    }
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+
+    labels.push(r.data);
+    pesoData.push(peso.toFixed(2));
+    massaGrassaData.push(mg.toFixed(2));
+    massaMagraData.push((peso - mg).toFixed(2));
+  });
+
+  const ctx = document.getElementById('graficoProgressi').getContext('2d');
+  if (window.myChart) window.myChart.destroy();
+  window.myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Peso (kg)', data: pesoData, borderWidth: 2, fill: false },
+        { label: 'Massa Grassa (kg)', data: massaGrassaData, borderWidth: 2, fill: false },
+        { label: 'Massa Magra (kg)', data: massaMagraData, borderWidth: 2, fill: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: false }
+      }
+    }
+  });
+}
+</script>
+<div id="obiettivi" style="margin-top:20px; padding:10px; border:1px solid #444;">
+<h3>Obiettivi Personalizzati</h3>
+<label>Peso Target (kg)</label>
+<input id="pesoTarget" onchange="aggiornaAIStatus()" type="number" value="74"/>
+<label>% Massa Grassa Target</label>
+<input id="grassoTarget" onchange="aggiornaAIStatus()" type="number" value="9"/>
+</div>
+<div style="margin-top:20px;">
+<button onclick="esportaCSV()">Esporta dati in CSV</button>
+</div>
+<script>
+function esportaCSV() {
+  let csv = "Data,Allenamento,Calorie,TDEE,Proteine,Carboidrati,Grassi\n";
+  storico.forEach(r => {
+    csv += `${r.data},${r.allenamento},${r.kcal},${r.tdee},${r.proteine},${r.carboidrati},${r.grassi}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "storico_dati.csv";
+  link.click();
+}
+</script>
+<div style="margin-top:20px;">
+<button onclick="toggleTema()">Cambia Tema</button>
+</div>
+<script>
+function toggleTema() {
+  const body = document.body;
+  if (body.style.backgroundColor === 'white') {
+    body.style.backgroundColor = '#121212';
+    body.style.color = '#fff';
+  } else {
+    body.style.backgroundColor = 'white';
+    body.style.color = '#000';
+  }
+}
+</script>
+<div id="dashboardMensile" style="margin-top:20px; padding:10px; border:1px solid #444;">
+<h3>Dashboard Mensile</h3>
+<div id="contenutoDashboard"></div>
+</div>
+<script>
+function aggiornaDashboardMensile() {
+  if (!storico.length) {
+    document.getElementById("contenutoDashboard").innerHTML = "<p>Nessun dato disponibile.</p>";
+    return;
+  }
+
+  const mensile = {};
+  let peso = 79.5, mg = peso * 0.129;
+
+  storico.forEach(r => {
+    const d = new Date(r.data);
+    const key = `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}`;
+    const deficit = r.tdee - r.kcal;
+    let grasso = 0, muscolo = 0;
+    if (deficit > 700 || r.proteine < 1.6 * peso) {
+      grasso = (deficit * 0.85) / 7700;
+      muscolo = (deficit * 0.15) / 7700;
+    } else {
+      grasso = deficit / 7700;
+    }
+
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+    const mm = peso - mg;
+
+    if (!mensile[key]) mensile[key] = [];
+    mensile[key].push({ peso: peso, grasso: mg, magra: mm });
+  });
+
+  let html = "<table><tr><th>Mese</th><th>Peso medio</th><th>Massa Grassa media</th><th>Massa Magra media</th></tr>";
+  Object.entries(mensile).forEach(([mese, valori]) => {
+    const p = (valori.reduce((s, v) => s + v.peso, 0) / valori.length).toFixed(2);
+    const g = (valori.reduce((s, v) => s + v.grasso, 0) / valori.length).toFixed(2);
+    const m = (valori.reduce((s, v) => s + v.magra, 0) / valori.length).toFixed(2);
+    html += `<tr><td>${mese}</td><td>${p} kg</td><td>${g} kg</td><td>${m} kg</td></tr>`;
+  });
+  html += "</table>";
+
+  document.getElementById("contenutoDashboard").innerHTML = html;
+}
+</script>
+<div style="margin-top:20px; border:1px solid #444; padding:10px;">
+<h3>Backup &amp; Ripristino</h3>
+<button onclick="salvaBackup()">Esporta Backup (.json)</button>
+<input onchange="caricaBackup(event)" type="file"/>
+</div>
+<script>
+function salvaBackup() {
+  const dati = JSON.stringify(storico);
+  const blob = new Blob([dati], { type: 'application/json' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "backup_dati.json";
+  link.click();
+}
+
+function caricaBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      storico = JSON.parse(e.target.result);
+      localStorage.setItem("storicoFinale", JSON.stringify(storico));
+      aggiornaTabella();
+      aggiornaRiepilogoSelezione?.();
+      aggiornaAIStatus?.();
+      aggiornaDashboardMensile?.();
+      aggiornaGrafico?.();
+    } catch (err) {
+      alert("Errore nel caricamento del file.");
+    }
+  };
+  reader.readAsText(file);
+}
+</script>
+<div style="margin-top:20px; border:1px solid #444; padding:10px;">
+<h3>Foto Progressi</h3>
+<input accept="image/*" onchange="salvaFoto(event)" type="file"/>
+<div id="galleriaFoto" style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;"></div>
+</div>
+<script>
+let fotoProgressi = JSON.parse(localStorage.getItem("fotoProgressi") || "{}");
+
+function salvaFoto(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    const data = document.getElementById("data").value;
+    if (!data) return alert("Seleziona prima una data.");
+    fotoProgressi[data] = reader.result;
+    localStorage.setItem("fotoProgressi", JSON.stringify(fotoProgressi));
+    mostraGalleria();
+  };
+  reader.readAsDataURL(file);
+}
+
+function mostraGalleria() {
+  const galleria = document.getElementById("galleriaFoto");
+  galleria.innerHTML = "";
+  Object.entries(fotoProgressi).forEach(([data, img]) => {
+    galleria.innerHTML += `<div><strong>${data}</strong><br><img src="${img}" width="100"></div>`;
+  });
+}
+</script>
+<div id="motivazione" style="margin-top:20px; padding:10px; border:1px solid #444;"></div>
+<script>
+function motivazioneCoach() {
+  const div = document.getElementById("motivazione");
+  if (!storico.length) {
+    div.innerHTML = "<p>Inserisci dati per ricevere motivazione!</p>";
+    return;
+  }
+
+  let msg = "";
+  const ultimi7 = storico.slice(-7);
+  const mediaPro = ultimi7.reduce((a, b) => a + b.proteine, 0) / ultimi7.length;
+  const giorni = storico.length;
+  let peso = 79.5, mg = 79.5 * 0.129;
+  let totGrasso = 0, totMagra = 0;
+
+  storico.forEach(r => {
+    const def = r.tdee - r.kcal;
+    let grasso = def > 700 || r.proteine < 1.6 * peso ? (def * 0.85) / 7700 : def / 7700;
+    let muscolo = def > 700 || r.proteine < 1.6 * peso ? (def * 0.15) / 7700 : 0;
+    totGrasso += grasso;
+    totMagra += muscolo;
+    peso -= (grasso + muscolo);
+    mg -= grasso;
+  });
+
+  const consistenza7 = storico.slice(-7).length;
+  const consistenza14 = storico.slice(-14).length;
+  const consistenza30 = storico.slice(-30).length;
+
+  msg += `<p><strong>Proteine medie ultimi 7 giorni:</strong> ${mediaPro.toFixed(1)}g</p>`;
+  msg += `<p><strong>Consistenza:</strong> ${consistenza7}/7, ${consistenza14}/14, ${consistenza30}/30 giorni</p>`;
+  msg += `<p><strong>Perdita complessiva:</strong> ${totGrasso.toFixed(2)} kg di grasso, ${totMagra.toFixed(2)} kg di muscolo</p>`;
+
+  if (totMagra > 0.4) {
+    msg += `<p class='alert'>Hai perso troppa massa muscolare! Aumenta le proteine o riduci il deficit.</p>`;
+  } else if (totMagra > 0.2) {
+    msg += `<p class='attenzione'>Attenzione alla massa magra: sei al limite!</p>`;
+  } else {
+    msg += `<p class='ok'>Ottima gestione! Massa magra protetta.</p>`;
+  }
+
+  div.innerHTML = `<h3>Coach & Motivazione</h3>${msg}`;
+}
+</script>
+<div id="analisiMacro" style="margin-top:20px; padding:10px; border:1px solid #444;">
+<h3>Analisi Nutrizionale</h3>
+<button onclick="analizzaMacronutrienti()">Calcola macro totali</button>
+<div id="outputMacro" style="margin-top:10px;"></div>
+</div>
+<script>
+function analizzaMacronutrienti() {
+  if (!storico.length) {
+    document.getElementById("outputMacro").innerHTML = "<p>Nessun dato registrato.</p>";
+    return;
+  }
+
+  const settimanali = {}, mensili = {};
+  const oggi = new Date();
+
+  storico.forEach(r => {
+    const d = new Date(r.data);
+    const giornoSettimana = oggi.getTime() - d.getTime() < 7 * 86400000;
+    const meseCorrente = oggi.getMonth() === d.getMonth() && oggi.getFullYear() === d.getFullYear();
+
+    if (giornoSettimana) {
+      settimanali.pro = (settimanali.pro || 0) + r.proteine;
+      settimanali.cho = (settimanali.cho || 0) + r.carboidrati;
+      settimanali.fat = (settimanali.fat || 0) + r.grassi;
+    }
+
+    if (meseCorrente) {
+      mensili.pro = (mensili.pro || 0) + r.proteine;
+      mensili.cho = (mensili.cho || 0) + r.carboidrati;
+      mensili.fat = (mensili.fat || 0) + r.grassi;
+    }
+  });
+
+  const html = `
+    <p><strong>Ultimi 7 giorni:</strong><br>
+    Proteine: ${settimanali.pro?.toFixed(1) || 0}g, Carboidrati: ${settimanali.cho?.toFixed(1) || 0}g, Grassi: ${settimanali.fat?.toFixed(1) || 0}g</p>
+    <p><strong>Mese corrente:</strong><br>
+    Proteine: ${mensili.pro?.toFixed(1) || 0}g, Carboidrati: ${mensili.cho?.toFixed(1) || 0}g, Grassi: ${mensili.fat?.toFixed(1) || 0}g</p>
+  `;
+  document.getElementById("outputMacro").innerHTML = html;
+}
+</script>
+<div style="margin-top:20px; padding:10px; border:1px solid #444;">
+<h3>Note del Giorno</h3>
+<textarea id="noteGiornaliere" placeholder="Es: dormito poco, infortunio..." rows="3" style="width:100%;"></textarea>
+</div>
+<script>
+let noteData = JSON.parse(localStorage.getItem("noteData") || "{}");
+
+document.getElementById("data").addEventListener("change", () => {
+  const data = document.getElementById("data").value;
+  document.getElementById("noteGiornaliere").value = noteData[data] || "";
+});
+
+document.getElementById("noteGiornaliere").addEventListener("input", () => {
+  const data = document.getElementById("data").value;
+  if (data) {
+    noteData[data] = document.getElementById("noteGiornaliere").value;
+    localStorage.setItem("noteData", JSON.stringify(noteData));
+  }
+});
+</script>
+<div style="margin-top:20px; padding:10px; border:1px solid #444;">
+<h3>Calcola Peso per % Grasso Target</h3>
+<label>Inserisci % massa grassa desiderata</label>
+<input id="percentualeGrassoDesiderata" onchange="calcolaPesoTarget()" type="number" value="10"/>
+<div id="risultatoPesoTarget" style="margin-top:10px;"></div>
+</div>
+<script>
+function calcolaPesoTarget() {
+  const attualePeso = 79.5;
+  const attualeGrasso = attualePeso * 0.129;
+  const massaMagra = attualePeso - attualeGrasso;
+
+  const percTarget = parseFloat(document.getElementById("percentualeGrassoDesiderata").value) / 100;
+  if (percTarget <= 0 || percTarget >= 1) {
+    document.getElementById("risultatoPesoTarget").innerHTML = "<p class='alert'>Inserisci una percentuale valida.</p>";
+    return;
+  }
+
+  const pesoIdeale = (massaMagra / (1 - percTarget)).toFixed(2);
+  document.getElementById("risultatoPesoTarget").innerHTML = `<p>Peso ideale per ${percTarget * 100}% massa grassa: <strong>${pesoIdeale} kg</strong></p>`;
+}
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').then(function(registration) {
+      console.log('ServiceWorker registrato con successo:', registration.scope);
+    }, function(err) {
+      console.log('ServiceWorker registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
